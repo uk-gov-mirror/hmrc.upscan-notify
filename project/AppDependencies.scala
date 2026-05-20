@@ -2,8 +2,8 @@ import sbt._
 
 object AppDependencies {
 
-  private val bootstrapVersion = "10.6.0"
-  private val awsSdkVersion = "2.35.1"
+  private val bootstrapVersion = "10.7.0"
+  private val awsSdkVersion = "2.44.7"
 
   val compile = Seq(
     "uk.gov.hmrc"            %% "bootstrap-backend-play-30" % bootstrapVersion,
