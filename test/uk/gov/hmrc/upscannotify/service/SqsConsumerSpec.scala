@@ -18,20 +18,20 @@ package uk.gov.hmrc.upscannotify.service
 
 import org.apache.pekko.actor.ActorSystem
 import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.{atLeast => atLeastTimes, times, verify, when}
+import org.mockito.Mockito.{times, verify, when, atLeast as atLeastTimes}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
-import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, ChangeMessageVisibilityResponse, DeleteMessageRequest, DeleteMessageResponse, Message, ReceiveMessageRequest, ReceiveMessageResponse}
+import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, ChangeMessageVisibilityResponse, DeleteMessageRequest, DeleteMessageResponse, Message, MessageSystemAttributeName, ReceiveMessageRequest, ReceiveMessageResponse}
 import uk.gov.hmrc.upscannotify.config.ServiceConfiguration
-import uk.gov.hmrc.upscannotify.model.{Message => UpscanMessage}
+import uk.gov.hmrc.upscannotify.model.Message as UpscanMessage
 import uk.gov.hmrc.upscannotify.test.UnitSpec
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.jdk.FutureConverters._
+import scala.jdk.FutureConverters.*
 
 class SqsConsumerSpec extends UnitSpec with Eventually with BeforeAndAfterEach:
   self =>
@@ -41,7 +41,8 @@ class SqsConsumerSpec extends UnitSpec with Eventually with BeforeAndAfterEach:
   val serviceConfiguration = mock[ServiceConfiguration]
   when(serviceConfiguration.retryInterval)
     .thenReturn(1.second)
-
+  when(serviceConfiguration.maxRetryInterval)
+    .thenReturn(20.seconds)
   val queueUrl = "queueUrl"
 
   "SqsConsumer" should:

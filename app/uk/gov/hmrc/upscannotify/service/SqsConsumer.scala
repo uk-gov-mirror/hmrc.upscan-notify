@@ -21,7 +21,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
 import play.api.Logging
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
-import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, ReceiveMessageRequest}
+import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, MessageSystemAttributeName, ReceiveMessageRequest}
 import uk.gov.hmrc.upscannotify.config.ServiceConfiguration
 
 import javax.inject.Inject
@@ -61,6 +61,7 @@ class SqsConsumer @Inject()(
         ReceiveMessageRequest.builder()
           .queueUrl(job.queueUrl)
           .maxNumberOfMessages(job.processingBatchSize)
+          .messageSystemAttributeNames(MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT)
           .waitTimeSeconds(job.waitTime.toSeconds.toInt)
           .build
       .mapAsync(parallelism = 1)(getMessages(job.queueUrl, _))
@@ -109,15 +110,30 @@ class SqsConsumer @Inject()(
         logger.debug:
           s"Deleted message from Queue: [${queueUrl}], for receiptHandle: [${message.receiptHandle}]."
 
+  private def receiveCount(message: Message): Int =
+    Option(message.attributes().get(MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT))
+      .flatMap(_.toIntOption)
+      .getOrElse(1)
+
+  private def retryDelaySeconds(retryCount: Int): Int =
+    math.min(
+      serviceConfiguration.retryInterval.toSeconds.toInt *
+        math.pow(2, retryCount - 1).toInt,
+      serviceConfiguration.maxRetryInterval.toSeconds.toInt
+    )
+
   private def returnMessage(queueUrl: String, message: Message): Future[Unit] =
+    val retryCount = receiveCount(message)
+    val delay      = retryDelaySeconds(retryCount)
+
     sqsClient
       .changeMessageVisibility:
         ChangeMessageVisibilityRequest.builder()
           .queueUrl(queueUrl)
           .receiptHandle(message.receiptHandle)
-          .visibilityTimeout(serviceConfiguration.retryInterval.toSeconds.toInt)
+          .visibilityTimeout(delay)
           .build()
       .asScala
       .map: _ =>
         logger.debug:
-          s"Returned message back to the queue (after ${serviceConfiguration.retryInterval}): [${queueUrl}], for receiptHandle: [${message.receiptHandle}]."
+          s"Returned message back to the queue (attempt $retryCount, delay $delay sec): [${queueUrl}], for receiptHandle: [${message.receiptHandle}]."
