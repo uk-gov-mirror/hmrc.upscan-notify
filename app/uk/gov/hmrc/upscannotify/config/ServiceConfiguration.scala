@@ -23,6 +23,8 @@ import scala.concurrent.duration._
 
 trait ServiceConfiguration:
   def retryInterval: FiniteDuration
+  
+  def maxRetryInterval: FiniteDuration
 
   def outboundSuccessfulQueueUrl: String
 
@@ -90,6 +92,9 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
   override def retryInterval: FiniteDuration =
     configuration.get[FiniteDuration]("aws.sqs.retry.interval")
 
+  override def maxRetryInterval: FiniteDuration =
+    configuration.get[FiniteDuration]("aws.sqs.max.retry.interval")
+    
   override def s3UrlExpirationPeriod(serviceName: String): FiniteDuration =
     val serviceS3UrlExpiry = validS3UrlExpirationPeriodWithKey(configKeyForConsumingService(serviceName, defaultS3UrlExpirationPeriodKey))
     val defaultS3UrlExpiry = defaultS3UrlExpirationPeriodKey -> configuration.get[FiniteDuration](configKeyForDefault(defaultS3UrlExpirationPeriodKey))
